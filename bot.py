@@ -5,7 +5,7 @@ from googleapiclient.http import MediaFileUpload
 
 # --- CLOUDFLARE KV HELPERS ---
 def is_already_posted(v_id):
-    """Cloudflare KV check taaki duplicate posts na hon"""
+    """Checks Cloudflare KV to skip duplicate videos"""
     acc, kv, token = os.getenv("CF_ACCOUNT_ID"), os.getenv("CF_KV_NAMESPACE_ID"), os.getenv("CF_API_TOKEN")
     url = f"https://api.cloudflare.com/client/v4/accounts/{acc}/storage/kv/namespaces/{kv}/values/{v_id}"
     headers = {"Authorization": f"Bearer {token}"}
@@ -15,41 +15,42 @@ def is_already_posted(v_id):
     except: return False
 
 def update_kv(v_id):
-    """Video ID ko Cloudflare KV mein 'posted' mark karna"""
+    """Saves Video ID to Cloudflare KV using Edit permissions"""
     acc, kv, token = os.getenv("CF_ACCOUNT_ID"), os.getenv("CF_KV_NAMESPACE_ID"), os.getenv("CF_API_TOKEN")
     url = f"https://api.cloudflare.com/client/v4/accounts/{acc}/storage/kv/namespaces/{kv}/values/{v_id}"
     headers = {"Authorization": f"Bearer {token}"}
-    requests.put(url, headers=headers, data="posted")
+    
+    try:
+        # Putting data marks the video as posted
+        res = requests.put(url, headers=headers, data="posted")
+        if res.status_code == 200:
+            print(f"✅ Cloudflare KV Updated: {v_id} skip hoga agli baar.")
+        else:
+            print(f"❌ KV Update Failed! Status: {res.status_code}, Response: {res.text}")
+    except Exception as e:
+        print(f"❌ Cloudflare Connection Error: {e}")
 
-# --- GOOGLE DRIVE BACKUP (Fixed for 403 Error) ---
+# --- GOOGLE DRIVE BACKUP (Fixed for Quota Error) ---
 def backup_to_drive(file_path, file_name):
-    """Upload to shared folder using shared storage quota"""
+    """Uploads to Shared Folder using parents and supportsAllDrives"""
     folder_id = os.getenv("GDRIVE_FOLDER_ID")
-    if not folder_id: 
-        print("❌ Error: GDRIVE_FOLDER_ID environment variable missing!")
-        return
+    if not folder_id: return
     try:
         creds_info = json.loads(os.getenv("GDRIVE_JSON"))
         creds = service_account.Credentials.from_service_account_info(creds_info)
         service = build('drive', 'v3', credentials=creds)
         
         file_metadata = {'name': file_name, 'parents': [folder_id]}
+        # resumable=False avoids quota issues for Service Accounts
         media = MediaFileUpload(file_path, mimetype='video/mp4', resumable=False)
-        
-        # supportsAllDrives=True is mandatory to use shared folder quota
-        service.files().create(
-            body=file_metadata, 
-            media_body=media, 
-            supportsAllDrives=True, 
-            fields='id'
-        ).execute()
-        print("✅ Drive Backup Successful!")
+        service.files().create(body=file_metadata, media_body=media, supportsAllDrives=True).execute()
+        print("✅ Google Drive Backup Done!")
     except Exception as e: 
-        print(f"❌ Drive Error (Check Quota/Permissions): {e}")
+        print(f"❌ Drive Error: {e}")
 
-# --- RANDOM ADULT CAPTIONS LOGIC ---
+# --- RANDOM ADULT CAPTIONS & BRANDING ---
 def get_random_caption(user_name):
-    """Random Hinglish adult captions with branding"""
+    """Large list of spicy captions and hashtags for Freepornx.site"""
     captions = [
         f"Uff! Ye video ekdum hot hai 🔥 Credits: {user_name}",
         f"New NSFW trending clip is here! 🔞 Credits: {user_name}",
@@ -89,56 +90,49 @@ def get_random_caption(user_name):
     ]
     return f"{random.choice(captions)}\n\n{random.choice(hashtag_sets)}"
 
-# --- MAIN RUN ---
+# --- MAIN BOT RUN ---
 def run_bot():
     print("🔎 Starting Bot Operations...")
     try:
-        # RedGIFs Auth
+        # RedGIFs Authentication
         auth_url = "https://api.redgifs.com/v2/auth/temporary"
         token = requests.get(auth_url).json().get('token')
         
-        # Search Content
-        res = requests.get("https://api.redgifs.com/v2/gifs/search?search_text=trending&order=trending&count=5", headers={"Authorization": f"Bearer {token}"}).json()
+        # Search Trending Content
+        res = requests.get("https://api.redgifs.com/v2/gifs/search?search_text=trending&order=trending&count=10", headers={"Authorization": f"Bearer {token}"}).json()
         gifs = res.get('gifs', [])
         
         for gif in gifs:
             v_id, user = gif.get('id'), gif.get('userName', 'Trending')
+            
+            # Step 1: Check Cloudflare KV for duplicates
             if not is_already_posted(v_id):
                 print(f"🎯 New Video Found: {v_id}")
-                with yt_dlp.YoutubeDL({'outtmpl': 'temp.mp4', 'quiet': True}) as ydl:
-                    ydl.download([f"https://www.redgifs.com/watch/{v_id}"])
+                video_url = f"https://www.redgifs.com/watch/{v_id}"
                 
-                # 1. Drive Backup
+                # Download Video
+                with yt_dlp.YoutubeDL({'outtmpl': 'temp.mp4', 'quiet': True}) as ydl:
+                    ydl.download([video_url])
+                
+                # Step 2: Backup to Google Drive
                 backup_to_drive('temp.mp4', f"{v_id}.mp4")
                 
-                # 2. Twitter Post (Fixed Authentication Logic)
+                # Step 3: Twitter Post (Tokens:)
+                print("🐦 Uploading to Twitter...")
                 caption = get_random_caption(user)
-                
-                # API v1.1 for Media Upload
-                auth = tweepy.OAuth1UserHandler(
-                    os.getenv("TW_API_KEY"), os.getenv("TW_API_SECRET"),
-                    os.getenv("TW_ACCESS_TOKEN"), os.getenv("TW_ACCESS_SECRET")
-                )
+                auth = tweepy.OAuth1UserHandler(os.getenv("TW_API_KEY"), os.getenv("TW_API_SECRET"), os.getenv("TW_ACCESS_TOKEN"), os.getenv("TW_ACCESS_SECRET"))
                 api = tweepy.API(auth)
-                
-                print("🐦 Uploading media to Twitter...")
                 media = api.media_upload(filename='temp.mp4', media_category='tweet_video')
                 
-                # API v2 for Creating Tweet
-                client = tweepy.Client(
-                    consumer_key=os.getenv("TW_API_KEY"),
-                    consumer_secret=os.getenv("TW_API_SECRET"),
-                    access_token=os.getenv("TW_ACCESS_TOKEN"),
-                    access_token_secret=os.getenv("TW_ACCESS_SECRET")
-                )
+                client = tweepy.Client(os.getenv("TW_API_KEY"), os.getenv("TW_API_SECRET"), os.getenv("TW_ACCESS_TOKEN"), os.getenv("TW_ACCESS_SECRET"))
                 client.create_tweet(text=caption, media_ids=[media.media_id])
                 
-                # 3. Mark as Posted
+                # Step 4: Update Cloudflare KV to avoid repeat
                 update_kv(v_id)
-                print(f"✨ Mission Successful! Posted with: {caption}")
+                print(f"✨ Mission Successful! Posted: {v_id}")
                 return
-        print("😴 No new videos found.")
-    except Exception as e: 
+        print("😴 No new unique videos found.")
+    except Exception as e:
         print(f"❌ Bot Execution Error: {e}")
 
 if __name__ == "__main__":
