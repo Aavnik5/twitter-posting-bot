@@ -1,8 +1,8 @@
 name: Twitter Video Bot
 on:
   schedule:
-    - cron: '0 */6 * * *' # Har 6 ghante mein chalega
-  workflow_dispatch: # Manual button check ke liye
+    - cron: '0 */6 * * *' 
+  workflow_dispatch:
 
 jobs:
   build:
@@ -12,7 +12,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.10' # Updated to 3.10
       - name: Run Bot
         env:
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
@@ -23,6 +23,7 @@ jobs:
           TW_ACCESS_TOKEN: ${{ secrets.TW_ACCESS_TOKEN }}
           TW_ACCESS_SECRET: ${{ secrets.TW_ACCESS_SECRET }}
           GDRIVE_JSON: ${{ secrets.GDRIVE_JSON }}
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
         run: |
           pip install -r requirements.txt
           python bot.py
