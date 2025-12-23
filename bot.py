@@ -29,7 +29,7 @@ def update_kv(video_id):
     requests.put(url, headers=headers, data="posted")
 
 def backup_to_drive(file_path, file_name):
-    print("🚀 Google Drive par backup ho raha hai...")
+    print("🚀 Google Drive backup starting...")
     try:
         creds_info = json.loads(os.getenv("GDRIVE_JSON"))
         creds = service_account.Credentials.from_service_account_info(creds_info)
@@ -44,63 +44,57 @@ def post_to_twitter(file_path, title):
     caption = f"{title}\n\n#RedGIFs #Viral #Trending #Freshubs"
     auth = tweepy.OAuth1UserHandler(os.getenv("TW_API_KEY"), os.getenv("TW_API_SECRET"), os.getenv("TW_ACCESS_TOKEN"), os.getenv("TW_ACCESS_SECRET"))
     api = tweepy.API(auth)
-    print("🐦 Twitter par upload ho raha hai...")
+    print("🐦 Uploading to Twitter...")
     media = api.media_upload(filename=file_path, media_category='tweet_video')
     client = tweepy.Client(consumer_key=os.getenv("TW_API_KEY"), consumer_secret=os.getenv("TW_API_SECRET"), access_token=os.getenv("TW_ACCESS_TOKEN"), access_token_secret=os.getenv("TW_ACCESS_SECRET"))
     client.create_tweet(text=caption, media_ids=[media.media_id])
 
-# --- DYNAMIC TRENDING LOGIC ---
+# --- DYNAMIC SCRAPING LOGIC ---
 
 def run_bot():
-    # Trending aur Popular dono URLs try karenge
-    urls_to_try = [
-        "https://www.redgifs.com/gifs/search/popular",
-        "https://www.redgifs.com/trending"
-    ]
+    # Tags are more stable than search/browse pages
+    # Aap 'trending' ki jagah 'funny' ya 'gaming' bhi likh sakte hain
+    tag_name = "trending" 
+    target_url = f"https://www.redgifs.com/tags/{tag_name}"
     
     ydl_opts_list = {
         'quiet': True, 
         'extract_flat': True,
+        'force_generic_extractor': False,
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'referer': 'https://www.redgifs.com/'
     }
 
-    found_video = False
-    for search_url in urls_to_try:
-        if found_video: break
-        
-        print(f"🔎 Scanning: {search_url}")
-        with yt_dlp.YoutubeDL(ydl_opts_list) as ydl:
-            try:
-                result = ydl.extract_info(search_url, download=False)
-                if 'entries' in result and result['entries']:
-                    for entry in result['entries']:
-                        video_id = entry['id']
-                        if not is_already_posted(video_id):
-                            print(f"🎯 New Video Found: {video_id}")
-                            video_url = f"https://www.redgifs.com/watch/{video_id}"
+    print(f"🔎 Scanning Tag: {tag_name}")
+    with yt_dlp.YoutubeDL(ydl_opts_list) as ydl:
+        try:
+            result = ydl.extract_info(target_url, download=False)
+            if 'entries' in result and result['entries']:
+                for entry in result['entries']:
+                    video_id = entry['id']
+                    if not is_already_posted(video_id):
+                        print(f"🎯 New Video Found: {video_id}")
+                        video_url = f"https://www.redgifs.com/watch/{video_id}"
+                        
+                        dl_opts = {
+                            'outtmpl': 'temp.mp4', 
+                            'quiet': True,
+                            'user_agent': ydl_opts_list['user_agent']
+                        }
+                        
+                        with yt_dlp.YoutubeDL(dl_opts) as dl:
+                            info = dl.extract_info(video_url, download=True)
+                            title = info.get('title', f'Trending {tag_name}')
                             
-                            dl_opts = {
-                                'outtmpl': 'temp.mp4', 
-                                'quiet': True,
-                                'user_agent': ydl_opts_list['user_agent']
-                            }
+                            backup_to_drive('temp.mp4', f"{video_id}.mp4")
+                            post_to_twitter('temp.mp4', title)
+                            update_kv(video_id)
                             
-                            with yt_dlp.YoutubeDL(dl_opts) as dl:
-                                info = dl.extract_info(video_url, download=True)
-                                title = info.get('title', 'Trending Now')
-                                
-                                backup_to_drive('temp.mp4', f"{video_id}.mp4")
-                                post_to_twitter('temp.mp4', title)
-                                update_kv(video_id)
-                                
-                                print("✨ Mission Accomplished!")
-                                found_video = True
-                                break 
-                else:
-                    print(f"⚠️ No entries in {search_url}, trying next...")
-            except Exception as e:
-                print(f"⚠️ Error on {search_url}: {e}")
+                            print("✨ Success!")
+                            return 
+            else:
+                print("⚠️ No videos found in this tag.")
+        except Exception as e:
+            print(f"⚠️ Scraping Error: {e}")
 
 if __name__ == "__main__":
     run_bot()
