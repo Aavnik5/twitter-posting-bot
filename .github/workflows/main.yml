@@ -1,0 +1,28 @@
+name: Twitter Video Bot
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Har 6 ghante mein chalega
+  workflow_dispatch: # Manual button check ke liye
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Run Bot
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          TW_API_KEY: ${{ secrets.TW_API_KEY }}
+          TW_API_SECRET: ${{ secrets.TW_API_SECRET }}
+          TW_ACCESS_TOKEN: ${{ secrets.TW_ACCESS_TOKEN }}
+          TW_ACCESS_SECRET: ${{ secrets.TW_ACCESS_SECRET }}
+          GDRIVE_JSON: ${{ secrets.GDRIVE_JSON }}
+        run: |
+          pip install -r requirements.txt
+          python bot.py
