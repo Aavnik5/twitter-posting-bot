@@ -37,21 +37,41 @@ def backup_to_drive(file_path, file_name):
 def get_random_caption(user_name):
     """Generates random Hinglish adult captions and hashtags"""
     captions = [
-        f"Uff! Ye video ekdum hot hai 🔥 Credits: {user_name}",
+       f"Uff! Ye video ekdum hot hai 🔥 Credits: {user_name}",
         f"New NSFW trending clip is here! 🔞 Credits: {user_name}",
         f"Check out this bold content by {user_name} 💎",
         f"Aaj ka sabse best adult video! 🚀 Credits: {user_name}",
         f"Don't miss this spicy clip by {user_name} 🌶️",
         f"Naya spicy maal aa gaya! 🌟 Credits: {user_name}",
-        f"Ye clip dekh kar maza aa jayega! 🎯 Credits: {user_name}"
+        f"Ye clip dekh kar maza aa jayega! 🎯 Credits: {user_name}",
+        f"Maza aa jayega ye dekh kar! 🔥 Credits: {user_name}",
+        f"Bohot hi bold aur spicy content 🔞. Made by {user_name}",
+        f"Is clip ko miss mat karna 💎. Credits: {user_name}",
+        f"Late night special video for you 🌙. Credits: {user_name}",
+        f"Extreme hotness in this clip! 🌶️ By {user_name}",
+        f"Pakka pasand aayega ye maal 🎯. Credits: {user_name}",
+        f"Sabse viral adult video abhi tak ka 🚀. By {user_name}",
+        f"Truly wild and uncut version! ✨ Credits: {user_name}",
+        f"Amateur beauty at its best 🔞. By {user_name}",
+        f"Spicy content level 100! 🔥 Credits: {user_name}"
     ]
     hashtag_sets = [
-        "#NSFW #AdultContent #RedGIFs #Viral #PornVideo",
-        "#HotVideo #Porn #RedGIFs #TrendingNow #Adult",
+       "#NSFW #AdultContent #Freepornx.site #Viral #PornVideo",
+        "#HotVideo #Porn #Freepornx.site #TrendingNow #Adult",
         "#Naughty #Spicy #Freshubs #NSFWVideo #Xxx",
-        "#AdultVideo #RedGIFs #ViralVideo #Hottest #Pornstar",
+        "#AdultVideo #Freepornx.site #ViralVideo #Hottest #Pornstar",
         "#Explicit #Trending #NSFW #Nude #Freshubs",
-        "#Porn #DailyViral #RedGIFs #Explore #Sextape"
+        "#Porn #DailyViral #Freepornx.site #Explore #Sextape",
+        "#Amateur #HotClip #Freepornx.site #Viral #Naughty",
+        "#Sextape #Bhabhi #ViralVideo #Adult #Spicy",
+        "#Freepornx.site #Desi #AdultContent #Hot #Nsfw",
+        "#Xxx #Sex #Trending #ViralClip #Freshubs",
+        "#Dirty #Horny #Freepornx.site #AdultVideo #Explicit",
+        "#Wild #Sexy #SpicyContent #TrendingNow #Nsfw",
+        "#NaughtyVideo #HotBhabhi #Freepornx.site #Freshubs #Viral",
+        "#AmateurPorn #ViralVideo #Freepornx.site #Adult #Hot",
+        "#LateNight #Sexting #Freepornx.site #SpicyMaal #Nsfw",
+        "#HotAdult #TrendingVideo #Freepornx.site #DailyViral #Sex"
     ]
     return f"{random.choice(captions)}\n\n{random.choice(hashtag_sets)}"
 
