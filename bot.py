@@ -1,4 +1,4 @@
-import os, requests, tweepy, yt_dlp, json, random
+import os, requests, tweepy, yt_dlp, json, random, time
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -39,10 +39,9 @@ def backup_to_drive(file_path, file_name):
             'name': file_name, 
             'parents': [folder_id]
         }
-        # resumable=False is mandatory for Service Accounts on small shared folders
+        # resumable=False is mandatory for Service Accounts to avoid quota errors
         media = MediaFileUpload(file_path, mimetype='video/mp4', resumable=False)
         
-        # supportsAllDrives allows the service account to interact with your shared folder
         service.files().create(
             body=file_metadata, 
             media_body=media, 
@@ -76,22 +75,22 @@ def get_random_caption(user_name):
         f"Spicy content level 100! 🔥 Credits: {user_name}"
     ]
     hashtag_sets = [
-        "#NSFW #AdultContent #Freepornx.site #Viral #PornVideo",
-        "#HotVideo #Porn #Freepornx.site #TrendingNow #Adult",
-        "#Naughty #Spicy #Freshubs #NSFWVideo #Xxx",
-        "#AdultVideo #Freepornx.site #ViralVideo #Hottest #Pornstar",
-        "#Explicit #Trending #NSFW #Nude #Freshubs",
-        "#Porn #DailyViral #Freepornx.site #Explore #Sextape",
-        "#Amateur #HotClip #Freepornx.site #Viral #Naughty",
+        "#NSFW #AdultContent #Viral #PornVideo",
+        "#HotVideo #Porn #TrendingNow #Adult",
+        "#Naughty #Spicy #NSFWVideo #Xxx",
+        "#AdultVideo #ViralVideo #Hottest #Pornstar",
+        "#Explicit #Trending #NSFW #Nude",
+        "#Porn #DailyViral #Explore #Sextape",
+        "#Amateur #HotClip #Viral #Naughty",
         "#Sextape #Bhabhi #ViralVideo #Adult #Spicy",
-        "#Freepornx.site #Desi #AdultContent #Hot #Nsfw",
-        "#Xxx #Sex #Trending #ViralClip #Freshubs",
-        "#Dirty #Horny #Freepornx.site #AdultVideo #Explicit",
+        "#Desi #AdultContent #Hot #Nsfw",
+        "#Xxx #Sex #Trending #ViralClip",
+        "#Dirty #Horny #AdultVideo #Explicit",
         "#Wild #Sexy #SpicyContent #TrendingNow #Nsfw",
-        "#NaughtyVideo #HotBhabhi #Freepornx.site #Freshubs #Viral",
-        "#AmateurPorn #ViralVideo #Freepornx.site #Adult #Hot",
-        "#LateNight #Sexting #Freepornx.site #SpicyMaal #Nsfw",
-        "#HotAdult #TrendingVideo #Freepornx.site #DailyViral #Sex"
+        "#NaughtyVideo #HotBhabhi #Viral",
+        "#AmateurPorn #ViralVideo #Adult #Hot",
+        "#LateNight #Sexting #SpicyMaal #Nsfw",
+        "#HotAdult #TrendingVideo #DailyViral #Sex"
     ]
     return f"{random.choice(captions)}\n\n{random.choice(hashtag_sets)}"
 
@@ -114,33 +113,52 @@ def run_bot():
                 video_url = f"https://www.redgifs.com/watch/{v_id}"
                 
                 # Download Video
+                if os.path.exists('temp.mp4'): os.remove('temp.mp4') # Purani file saaf karna
                 with yt_dlp.YoutubeDL({'outtmpl': 'temp.mp4', 'quiet': True}) as ydl:
                     ydl.download([video_url])
                 
                 # Step 1: Backup
                 backup_to_drive('temp.mp4', f"{v_id}.mp4")
                 
-                # Step 2: Twitter Upload (v1.1 for Media, v2 for Tweet)
-                # Ensure these keys match exactly with GitHub Secrets
+                # Step 2: Twitter Upload (Wait Logic Included)
                 print("🐦 Uploading to Twitter...")
                 auth = tweepy.OAuth1UserHandler(
                     os.getenv("TW_API_KEY"), os.getenv("TW_API_SECRET"),
                     os.getenv("TW_ACCESS_TOKEN"), os.getenv("TW_ACCESS_SECRET")
                 )
                 api = tweepy.API(auth)
-                media = api.media_upload(filename='temp.mp4', media_category='tweet_video')
                 
+                # Media Upload (v1.1 API)
+                media = api.media_upload(filename='temp.mp4', media_category='tweet_video')
+                media_id = media.media_id
+                
+                # --- NEW: Twitter Processing Wait Loop ---
+                print("⏳ Waiting for Twitter to process the video...")
+                while True:
+                    status = api.get_media_upload_status(media_id)
+                    if status.state == 'succeeded':
+                        print("✅ Processing Succeeded!")
+                        break
+                    elif status.state == 'failed':
+                        print("❌ Processing Failed!")
+                        return
+                    time.sleep(5) # 5 second wait karke fir check karega
+                
+                # Tweet Creation (v2 API)
                 client = tweepy.Client(
                     consumer_key=os.getenv("TW_API_KEY"),
                     consumer_secret=os.getenv("TW_API_SECRET"),
                     access_token=os.getenv("TW_ACCESS_TOKEN"),
                     access_token_secret=os.getenv("TW_ACCESS_SECRET")
                 )
-                client.create_tweet(text=get_random_caption(user), media_ids=[media.media_id])
+                client.create_tweet(text=get_random_caption(user), media_ids=[media_id])
                 
                 # Step 3: KV Update
                 update_kv(v_id)
                 print(f"✨ Mission Successful! Posted: {v_id}")
+                
+                # File Cleanup
+                if os.path.exists('temp.mp4'): os.remove('temp.mp4')
                 return
         print("😴 No new videos found.")
     except Exception as e: 
